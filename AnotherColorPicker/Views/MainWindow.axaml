@@ -9,11 +9,14 @@
         x:Class="AnotherColorPicker.Views.MainWindow"
         x:DataType="vm:MainWindowViewModel"
         Title="Another Color Picker"
+        Icon="avares://AnotherColorPicker/Assets/main_icon.png"
         Width="960" Height="680"
         MinWidth="860" MinHeight="600"
         WindowStartupLocation="CenterScreen"
         CanResize="True"
-        Background="#1A1A2E">
+        ExtendClientAreaToDecorationsHint="True"
+        ExtendClientAreaTitleBarHeightHint="50"
+        Background="#242424">
 
     <Design.DataContext>
         <vm:MainWindowViewModel/>
@@ -21,31 +24,35 @@
 
     <Panel>
         <!-- Main content -->
-        <Grid RowDefinitions="Auto,*" Margin="0,32,0,0">
+        <Grid RowDefinitions="Auto,*" Margin="0">
 
-            <!-- Title bar area -->
-            <Grid Row="0" ColumnDefinitions="*,Auto" Margin="20,8,20,4">
-                <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                    <TextBlock Text="🎨" FontSize="20" Margin="0,0,8,0" VerticalAlignment="Center"/>
-                    <TextBlock Text="Another Color Picker" FontSize="16" FontWeight="Bold"
-                               Foreground="#E8E8F0" VerticalAlignment="Center"
+            <!-- Title bar area (HeaderBar) -->
+            <Grid Row="0" Height="50" Background="#242424">
+                <!-- Centered Title -->
+                <StackPanel Orientation="Horizontal" VerticalAlignment="Center" HorizontalAlignment="Center" IsHitTestVisible="False">
+                    <TextBlock Text="Another Color Picker" FontSize="14" FontWeight="Bold"
+                               Foreground="#FFFFFF" VerticalAlignment="Center"
                                FontFamily="Inter, Segoe UI, sans-serif"/>
                 </StackPanel>
-                <Button Grid.Column="1" Classes="action-btn"
-                        Command="{Binding PickFromScreenCommand}"
-                        ToolTip.Tip="Pick a color from screen">
-                    <StackPanel Orientation="Horizontal" Spacing="6">
-                        <TextBlock Text="💉" FontSize="14" VerticalAlignment="Center"/>
-                        <TextBlock Text="Pick color" FontSize="13" VerticalAlignment="Center"/>
-                    </StackPanel>
-                </Button>
+                
+                <!-- Left aligned tools -->
+                <StackPanel Orientation="Horizontal" HorizontalAlignment="Left" Margin="80,0,0,0" VerticalAlignment="Center">
+                    <Button Classes="action-btn"
+                            Command="{Binding PickFromScreenCommand}"
+                            ToolTip.Tip="Pick a color from screen">
+                        <StackPanel Orientation="Horizontal" Spacing="6">
+                            <TextBlock Text="💉" FontSize="14" VerticalAlignment="Center"/>
+                            <TextBlock Text="Pick color" FontSize="13" VerticalAlignment="Center"/>
+                        </StackPanel>
+                    </Button>
+                </StackPanel>
             </Grid>
 
             <!-- Main layout: left=canvas, right=controls -->
-            <Grid Row="1" ColumnDefinitions="380,*" Margin="20,8,20,16">
+            <Grid Row="1" ColumnDefinitions="380,*" Margin="20,16,20,16">
 
                 <!-- LEFT: Color Canvas + Preview -->
-                <StackPanel Grid.Column="0" Spacing="12" Margin="0,0,12,0">
+                <StackPanel Grid.Column="0" Spacing="16" Margin="0,0,16,0">
 
                     <!-- Color Canvas (Saturation/Value picker) -->
                     <Border Classes="panel" Padding="8">
@@ -139,7 +146,7 @@
 
                 <!-- RIGHT: Sliders, values, harmonies -->
                 <ScrollViewer Grid.Column="1" VerticalScrollBarVisibility="Auto">
-                    <StackPanel Spacing="12" Margin="4,0,0,0">
+                    <StackPanel Spacing="16" Margin="4,0,0,0">
 
                         <!-- RGB Section -->
                         <Border Classes="panel">
@@ -364,7 +371,7 @@
                 Opacity="{Binding ShowToast, Converter={StaticResource BoolToOpacityConverter}}">
             <StackPanel Orientation="Horizontal" Spacing="8">
                 <TextBlock Text="✓" Foreground="#51CF66" FontSize="14" FontWeight="Bold" VerticalAlignment="Center"/>
-                <TextBlock Text="{Binding ToastMessage}" Foreground="#E8E8F0" FontSize="13" VerticalAlignment="Center"
+                <TextBlock Text="{Binding ToastMessage}" Foreground="#FFFFFF" FontSize="13" VerticalAlignment="Center"
                            FontFamily="Inter, Segoe UI, sans-serif"/>
             </StackPanel>
         </Border>
