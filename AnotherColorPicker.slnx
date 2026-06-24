@@ -1,0 +1,4 @@
+<Solution>
+  <Project Path="AnotherColorPicker.Tests/AnotherColorPicker.Tests.csproj" />
+  <Project Path="AnotherColorPicker/AnotherColorPicker.csproj" />
+</Solution>

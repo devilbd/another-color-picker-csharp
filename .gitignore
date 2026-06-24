@@ -1,0 +1,42 @@
+# .NET
+bin/
+obj/
+*.user
+*.suo
+*.sln.docstates
+*.userprefs
+
+# IDE
+.vs/
+.vscode/
+.idea/
+*.swp
+*~
+
+# Build results
+[Dd]ebug/
+[Rr]elease/
+x64/
+x86/
+build/
+bld/
+
+# NuGet
+*.nupkg
+**/packages/*
+*.nuget.props
+*.nuget.targets
+project.lock.json
+
+# OS
+.DS_Store
+Thumbs.db
+*.tmp
+*.bak
+*.log
+
+# Rider
+*.sln.iml
+
+# Publish output
+publish/

@@ -1,0 +1,372 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:vm="using:AnotherColorPicker.ViewModels"
+        xmlns:controls="using:AnotherColorPicker.Controls"
+        xmlns:helpers="using:AnotherColorPicker.Helpers"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        mc:Ignorable="d" d:DesignWidth="960" d:DesignHeight="680"
+        x:Class="AnotherColorPicker.Views.MainWindow"
+        x:DataType="vm:MainWindowViewModel"
+        Title="Another Color Picker"
+        Width="960" Height="680"
+        MinWidth="860" MinHeight="600"
+        WindowStartupLocation="CenterScreen"
+        CanResize="True"
+        Background="#1A1A2E">
+
+    <Design.DataContext>
+        <vm:MainWindowViewModel/>
+    </Design.DataContext>
+
+    <Panel>
+        <!-- Main content -->
+        <Grid RowDefinitions="Auto,*" Margin="0,32,0,0">
+
+            <!-- Title bar area -->
+            <Grid Row="0" ColumnDefinitions="*,Auto" Margin="20,8,20,4">
+                <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                    <TextBlock Text="🎨" FontSize="20" Margin="0,0,8,0" VerticalAlignment="Center"/>
+                    <TextBlock Text="Another Color Picker" FontSize="16" FontWeight="Bold"
+                               Foreground="#E8E8F0" VerticalAlignment="Center"
+                               FontFamily="Inter, Segoe UI, sans-serif"/>
+                </StackPanel>
+                <Button Grid.Column="1" Classes="action-btn"
+                        Command="{Binding PickFromScreenCommand}"
+                        ToolTip.Tip="Pick a color from screen">
+                    <StackPanel Orientation="Horizontal" Spacing="6">
+                        <TextBlock Text="💉" FontSize="14" VerticalAlignment="Center"/>
+                        <TextBlock Text="Eyedropper" FontSize="13" VerticalAlignment="Center"/>
+                    </StackPanel>
+                </Button>
+            </Grid>
+
+            <!-- Main layout: left=canvas, right=controls -->
+            <Grid Row="1" ColumnDefinitions="380,*" Margin="20,8,20,16">
+
+                <!-- LEFT: Color Canvas + Preview -->
+                <StackPanel Grid.Column="0" Spacing="12" Margin="0,0,12,0">
+
+                    <!-- Color Canvas (Saturation/Value picker) -->
+                    <Border Classes="panel" Padding="8">
+                        <StackPanel Spacing="10">
+                            <controls:ColorCanvas
+                                Height="280"
+                                Hue="{Binding HueSliderValue, Mode=TwoWay}"
+                                Saturation="{Binding CanvasSaturation, Mode=TwoWay}"
+                                Value="{Binding CanvasValue, Mode=TwoWay}" />
+
+                            <!-- Hue Slider -->
+                            <controls:HueSlider
+                                Height="20"
+                                Margin="0,4"
+                                Hue="{Binding HueSliderValue, Mode=TwoWay}" />
+                        </StackPanel>
+                    </Border>
+
+                    <!-- Color Preview + Quick Info -->
+                    <Border Classes="panel">
+                        <Grid ColumnDefinitions="80,*">
+                            <!-- Color preview swatch -->
+                            <Border Grid.Column="0"
+                                    Width="64" Height="64"
+                                    CornerRadius="10"
+                                    Background="{Binding PreviewHex, Converter={StaticResource HexToBrushConverter}}"
+                                    BorderBrush="#3A3A5C" BorderThickness="2"
+                                    Margin="0,0,12,0"/>
+
+                            <!-- Quick info -->
+                            <StackPanel Grid.Column="1" VerticalAlignment="Center" Spacing="4">
+                                <Grid ColumnDefinitions="*,Auto">
+                                    <TextBox Grid.Column="0" Classes="color-input"
+                                             Text="{Binding HexText, Mode=TwoWay}"
+                                             FontSize="18" FontWeight="Bold"
+                                             FontFamily="JetBrains Mono, Consolas, monospace"/>
+                                    <Button Grid.Column="1" Classes="copy-btn" Margin="6,0,0,0"
+                                            Command="{Binding CopyHexCommand}"
+                                            ToolTip.Tip="Copy HEX">
+                                        <TextBlock Text="📋" FontSize="14"/>
+                                    </Button>
+                                </Grid>
+                                <TextBlock Text="{Binding PreviewHex, StringFormat='RGB({0})'}"
+                                           FontSize="11" Foreground="#7070A0"
+                                           FontFamily="JetBrains Mono, Consolas, monospace"/>
+                            </StackPanel>
+                        </Grid>
+                    </Border>
+
+                    <!-- History Panel -->
+                    <Border Classes="panel">
+                        <StackPanel Spacing="8">
+                            <Grid ColumnDefinitions="*,Auto,Auto">
+                                <TextBlock Grid.Column="0" Classes="section-header" Text="Color History"/>
+                                <Button Grid.Column="1" Classes="copy-btn" Margin="0,0,4,0"
+                                        Command="{Binding AddToHistoryCommand}"
+                                        ToolTip.Tip="Save current color">
+                                    <TextBlock Text="+" FontSize="16" FontWeight="Bold"/>
+                                </Button>
+                                <Button Grid.Column="2" Classes="copy-btn"
+                                        Command="{Binding ClearHistoryCommand}"
+                                        ToolTip.Tip="Clear history">
+                                    <TextBlock Text="🗑" FontSize="12"/>
+                                </Button>
+                            </Grid>
+
+                            <ItemsControl ItemsSource="{Binding ColorHistory}">
+                                <ItemsControl.ItemsPanel>
+                                    <ItemsPanelTemplate>
+                                        <WrapPanel/>
+                                    </ItemsPanelTemplate>
+                                </ItemsControl.ItemsPanel>
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate x:DataType="vm:HistoryColorItem">
+                                        <Button Classes="history-btn"
+                                                Background="{Binding Hex, Converter={StaticResource HexToBrushConverter}}"
+                                                Command="{Binding $parent[Window].((vm:MainWindowViewModel)DataContext).ApplyHistoryColorCommand}"
+                                                CommandParameter="{Binding Hex}"
+                                                ToolTip.Tip="{Binding Label}"/>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+
+                            <TextBlock Text="No colors saved yet"
+                                       IsVisible="{Binding !ColorHistory.Count}"
+                                       FontSize="12" Foreground="#505078"
+                                       HorizontalAlignment="Center" Margin="0,4"/>
+                        </StackPanel>
+                    </Border>
+                </StackPanel>
+
+                <!-- RIGHT: Sliders, values, harmonies -->
+                <ScrollViewer Grid.Column="1" VerticalScrollBarVisibility="Auto">
+                    <StackPanel Spacing="12" Margin="4,0,0,0">
+
+                        <!-- RGB Section -->
+                        <Border Classes="panel">
+                            <StackPanel Spacing="8">
+                                <Grid ColumnDefinitions="*,Auto">
+                                    <TextBlock Grid.Column="0" Classes="section-header" Text="RGB"/>
+                                    <Button Grid.Column="1" Classes="copy-btn"
+                                            Command="{Binding CopyRgbCommand}">
+                                        <TextBlock Text="📋" FontSize="12"/>
+                                    </Button>
+                                </Grid>
+
+                                <!-- Red -->
+                                <Grid ColumnDefinitions="30,*,55">
+                                    <TextBlock Grid.Column="0" Classes="label" Text="R"
+                                               VerticalAlignment="Center" Foreground="#FF6B6B"/>
+                                    <Slider Grid.Column="1" Minimum="0" Maximum="255"
+                                            Value="{Binding Red, Mode=TwoWay}"
+                                            Foreground="#FF6B6B"/>
+                                    <TextBox Grid.Column="2" Classes="color-input"
+                                             Text="{Binding Red, Mode=TwoWay}"
+                                             HorizontalContentAlignment="Center"/>
+                                </Grid>
+
+                                <!-- Green -->
+                                <Grid ColumnDefinitions="30,*,55">
+                                    <TextBlock Grid.Column="0" Classes="label" Text="G"
+                                               VerticalAlignment="Center" Foreground="#51CF66"/>
+                                    <Slider Grid.Column="1" Minimum="0" Maximum="255"
+                                            Value="{Binding Green, Mode=TwoWay}"
+                                            Foreground="#51CF66"/>
+                                    <TextBox Grid.Column="2" Classes="color-input"
+                                             Text="{Binding Green, Mode=TwoWay}"
+                                             HorizontalContentAlignment="Center"/>
+                                </Grid>
+
+                                <!-- Blue -->
+                                <Grid ColumnDefinitions="30,*,55">
+                                    <TextBlock Grid.Column="0" Classes="label" Text="B"
+                                               VerticalAlignment="Center" Foreground="#6C63FF"/>
+                                    <Slider Grid.Column="1" Minimum="0" Maximum="255"
+                                            Value="{Binding Blue, Mode=TwoWay}"
+                                            Foreground="#6C63FF"/>
+                                    <TextBox Grid.Column="2" Classes="color-input"
+                                             Text="{Binding Blue, Mode=TwoWay}"
+                                             HorizontalContentAlignment="Center"/>
+                                </Grid>
+                            </StackPanel>
+                        </Border>
+
+                        <!-- HSV Section -->
+                        <Border Classes="panel">
+                            <StackPanel Spacing="8">
+                                <TextBlock Classes="section-header" Text="HSV"/>
+
+                                <Grid ColumnDefinitions="30,*,55">
+                                    <TextBlock Grid.Column="0" Classes="label" Text="H" VerticalAlignment="Center"/>
+                                    <Slider Grid.Column="1" Minimum="0" Maximum="360"
+                                            Value="{Binding HsvHue, Mode=TwoWay}"/>
+                                    <TextBox Grid.Column="2" Classes="color-input"
+                                             Text="{Binding HsvHue, Mode=TwoWay, StringFormat='{}{0:F0}'}"
+                                             HorizontalContentAlignment="Center"/>
+                                </Grid>
+
+                                <Grid ColumnDefinitions="30,*,55">
+                                    <TextBlock Grid.Column="0" Classes="label" Text="S" VerticalAlignment="Center"/>
+                                    <Slider Grid.Column="1" Minimum="0" Maximum="100"
+                                            Value="{Binding HsvSaturation, Mode=TwoWay}"/>
+                                    <TextBox Grid.Column="2" Classes="color-input"
+                                             Text="{Binding HsvSaturation, Mode=TwoWay, StringFormat='{}{0:F0}'}"
+                                             HorizontalContentAlignment="Center"/>
+                                </Grid>
+
+                                <Grid ColumnDefinitions="30,*,55">
+                                    <TextBlock Grid.Column="0" Classes="label" Text="V" VerticalAlignment="Center"/>
+                                    <Slider Grid.Column="1" Minimum="0" Maximum="100"
+                                            Value="{Binding HsvValue, Mode=TwoWay}"/>
+                                    <TextBox Grid.Column="2" Classes="color-input"
+                                             Text="{Binding HsvValue, Mode=TwoWay, StringFormat='{}{0:F0}'}"
+                                             HorizontalContentAlignment="Center"/>
+                                </Grid>
+                            </StackPanel>
+                        </Border>
+
+                        <!-- HSL Section -->
+                        <Border Classes="panel">
+                            <StackPanel Spacing="8">
+                                <Grid ColumnDefinitions="*,Auto">
+                                    <TextBlock Grid.Column="0" Classes="section-header" Text="HSL"/>
+                                    <Button Grid.Column="1" Classes="copy-btn"
+                                            Command="{Binding CopyHslCommand}">
+                                        <TextBlock Text="📋" FontSize="12"/>
+                                    </Button>
+                                </Grid>
+
+                                <Grid ColumnDefinitions="30,*,55">
+                                    <TextBlock Grid.Column="0" Classes="label" Text="H" VerticalAlignment="Center"/>
+                                    <Slider Grid.Column="1" Minimum="0" Maximum="360"
+                                            Value="{Binding HslHue, Mode=TwoWay}"/>
+                                    <TextBox Grid.Column="2" Classes="color-input"
+                                             Text="{Binding HslHue, Mode=TwoWay, StringFormat='{}{0:F0}'}"
+                                             HorizontalContentAlignment="Center"/>
+                                </Grid>
+
+                                <Grid ColumnDefinitions="30,*,55">
+                                    <TextBlock Grid.Column="0" Classes="label" Text="S" VerticalAlignment="Center"/>
+                                    <Slider Grid.Column="1" Minimum="0" Maximum="100"
+                                            Value="{Binding HslSaturation, Mode=TwoWay}"/>
+                                    <TextBox Grid.Column="2" Classes="color-input"
+                                             Text="{Binding HslSaturation, Mode=TwoWay, StringFormat='{}{0:F0}'}"
+                                             HorizontalContentAlignment="Center"/>
+                                </Grid>
+
+                                <Grid ColumnDefinitions="30,*,55">
+                                    <TextBlock Grid.Column="0" Classes="label" Text="L" VerticalAlignment="Center"/>
+                                    <Slider Grid.Column="1" Minimum="0" Maximum="100"
+                                            Value="{Binding HslLightness, Mode=TwoWay}"/>
+                                    <TextBox Grid.Column="2" Classes="color-input"
+                                             Text="{Binding HslLightness, Mode=TwoWay, StringFormat='{}{0:F0}'}"
+                                             HorizontalContentAlignment="Center"/>
+                                </Grid>
+                            </StackPanel>
+                        </Border>
+
+                        <!-- CMYK Section -->
+                        <Border Classes="panel">
+                            <StackPanel Spacing="8">
+                                <Grid ColumnDefinitions="*,Auto">
+                                    <TextBlock Grid.Column="0" Classes="section-header" Text="CMYK"/>
+                                    <Button Grid.Column="1" Classes="copy-btn"
+                                            Command="{Binding CopyCmykCommand}">
+                                        <TextBlock Text="📋" FontSize="12"/>
+                                    </Button>
+                                </Grid>
+
+                                <Grid ColumnDefinitions="30,*,55">
+                                    <TextBlock Grid.Column="0" Classes="label" Text="C" VerticalAlignment="Center" Foreground="#22B8CF"/>
+                                    <Slider Grid.Column="1" Minimum="0" Maximum="100"
+                                            Value="{Binding CmykC, Mode=TwoWay}" Foreground="#22B8CF"/>
+                                    <TextBox Grid.Column="2" Classes="color-input"
+                                             Text="{Binding CmykC, Mode=TwoWay, StringFormat='{}{0:F0}'}"
+                                             HorizontalContentAlignment="Center"/>
+                                </Grid>
+
+                                <Grid ColumnDefinitions="30,*,55">
+                                    <TextBlock Grid.Column="0" Classes="label" Text="M" VerticalAlignment="Center" Foreground="#F06595"/>
+                                    <Slider Grid.Column="1" Minimum="0" Maximum="100"
+                                            Value="{Binding CmykM, Mode=TwoWay}" Foreground="#F06595"/>
+                                    <TextBox Grid.Column="2" Classes="color-input"
+                                             Text="{Binding CmykM, Mode=TwoWay, StringFormat='{}{0:F0}'}"
+                                             HorizontalContentAlignment="Center"/>
+                                </Grid>
+
+                                <Grid ColumnDefinitions="30,*,55">
+                                    <TextBlock Grid.Column="0" Classes="label" Text="Y" VerticalAlignment="Center" Foreground="#FAB005"/>
+                                    <Slider Grid.Column="1" Minimum="0" Maximum="100"
+                                            Value="{Binding CmykY, Mode=TwoWay}" Foreground="#FAB005"/>
+                                    <TextBox Grid.Column="2" Classes="color-input"
+                                             Text="{Binding CmykY, Mode=TwoWay, StringFormat='{}{0:F0}'}"
+                                             HorizontalContentAlignment="Center"/>
+                                </Grid>
+
+                                <Grid ColumnDefinitions="30,*,55">
+                                    <TextBlock Grid.Column="0" Classes="label" Text="K" VerticalAlignment="Center" Foreground="#868E96"/>
+                                    <Slider Grid.Column="1" Minimum="0" Maximum="100"
+                                            Value="{Binding CmykK, Mode=TwoWay}" Foreground="#868E96"/>
+                                    <TextBox Grid.Column="2" Classes="color-input"
+                                             Text="{Binding CmykK, Mode=TwoWay, StringFormat='{}{0:F0}'}"
+                                             HorizontalContentAlignment="Center"/>
+                                </Grid>
+                            </StackPanel>
+                        </Border>
+
+                        <!-- Harmony Section -->
+                        <Border Classes="panel">
+                            <StackPanel Spacing="8">
+                                <TextBlock Classes="section-header" Text="Color Harmonies"/>
+
+                                <ComboBox Classes="harmony-combo"
+                                          SelectedItem="{Binding SelectedHarmonyType, Mode=TwoWay}"
+                                          HorizontalAlignment="Stretch">
+                                    <ComboBoxItem Content="Complementary" IsSelected="True"/>
+                                    <ComboBoxItem Content="Analogous"/>
+                                    <ComboBoxItem Content="Triadic"/>
+                                    <ComboBoxItem Content="Tetradic"/>
+                                    <ComboBoxItem Content="Split Complementary"/>
+                                    <ComboBoxItem Content="Monochromatic"/>
+                                    <ComboBoxItem Content="Shades"/>
+                                    <ComboBoxItem Content="Tints"/>
+                                </ComboBox>
+
+                                <ItemsControl ItemsSource="{Binding HarmonyColors}">
+                                    <ItemsControl.ItemsPanel>
+                                        <ItemsPanelTemplate>
+                                            <WrapPanel/>
+                                        </ItemsPanelTemplate>
+                                    </ItemsControl.ItemsPanel>
+                                    <ItemsControl.ItemTemplate>
+                                        <DataTemplate x:DataType="vm:HarmonyColorItem">
+                                            <Button Classes="swatch-btn"
+                                                    Background="{Binding Hex, Converter={StaticResource HexToBrushConverter}}"
+                                                    Command="{Binding $parent[Window].((vm:MainWindowViewModel)DataContext).ApplyHarmonyColorCommand}"
+                                                    CommandParameter="{Binding Hex}"
+                                                    ToolTip.Tip="{Binding Label}"/>
+                                        </DataTemplate>
+                                    </ItemsControl.ItemTemplate>
+                                </ItemsControl>
+                            </StackPanel>
+                        </Border>
+
+                    </StackPanel>
+                </ScrollViewer>
+            </Grid>
+        </Grid>
+
+        <!-- Toast notification overlay -->
+        <Border Classes="toast"
+                IsVisible="{Binding ShowToast}"
+                HorizontalAlignment="Center"
+                VerticalAlignment="Bottom"
+                Margin="0,0,0,24"
+                Opacity="{Binding ShowToast, Converter={StaticResource BoolToOpacityConverter}}">
+            <StackPanel Orientation="Horizontal" Spacing="8">
+                <TextBlock Text="✓" Foreground="#51CF66" FontSize="14" FontWeight="Bold" VerticalAlignment="Center"/>
+                <TextBlock Text="{Binding ToastMessage}" Foreground="#E8E8F0" FontSize="13" VerticalAlignment="Center"
+                           FontFamily="Inter, Segoe UI, sans-serif"/>
+            </StackPanel>
+        </Border>
+    </Panel>
+</Window>
