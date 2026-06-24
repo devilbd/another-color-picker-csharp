@@ -36,7 +36,7 @@
                         ToolTip.Tip="Pick a color from screen">
                     <StackPanel Orientation="Horizontal" Spacing="6">
                         <TextBlock Text="💉" FontSize="14" VerticalAlignment="Center"/>
-                        <TextBlock Text="Eyedropper" FontSize="13" VerticalAlignment="Center"/>
+                        <TextBlock Text="Pick color" FontSize="13" VerticalAlignment="Center"/>
                     </StackPanel>
                 </Button>
             </Grid>
