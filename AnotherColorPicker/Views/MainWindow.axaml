@@ -14,8 +14,7 @@
         MinWidth="860" MinHeight="600"
         WindowStartupLocation="CenterScreen"
         CanResize="True"
-        ExtendClientAreaToDecorationsHint="True"
-        ExtendClientAreaTitleBarHeightHint="50"
+        WindowDecorations="None"
         Background="#242424">
 
     <Design.DataContext>
@@ -27,7 +26,7 @@
         <Grid RowDefinitions="Auto,*" Margin="0">
 
             <!-- Title bar area (HeaderBar) -->
-            <Grid Row="0" Height="50" Background="#242424">
+            <Grid Row="0" Height="50" Background="#242424" PointerPressed="TitleBar_PointerPressed">
                 <!-- Centered Title -->
                 <StackPanel Orientation="Horizontal" VerticalAlignment="Center" HorizontalAlignment="Center" IsHitTestVisible="False">
                     <TextBlock Text="Another Color Picker" FontSize="14" FontWeight="Bold"
@@ -35,23 +34,25 @@
                                FontFamily="Inter, Segoe UI, sans-serif"/>
                 </StackPanel>
                 
-                <!-- Left aligned tools -->
-                <StackPanel Orientation="Horizontal" HorizontalAlignment="Left" Margin="80,0,0,0" VerticalAlignment="Center">
-                    <Button Classes="action-btn"
-                            Command="{Binding PickFromScreenCommand}"
-                            ToolTip.Tip="Pick a color from screen">
-                        <StackPanel Orientation="Horizontal" Spacing="6">
-                            <TextBlock Text="💉" FontSize="14" VerticalAlignment="Center"/>
-                            <TextBlock Text="Pick color" FontSize="13" VerticalAlignment="Center"/>
-                        </StackPanel>
+
+                <!-- Right aligned close button -->
+                <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,0,16,0" VerticalAlignment="Center">
+                    <Button Width="32" Height="32" CornerRadius="16"
+                            Padding="0"
+                            HorizontalContentAlignment="Center"
+                            VerticalContentAlignment="Center"
+                            Background="Transparent" BorderThickness="0"
+                            Click="CloseButton_Click" ToolTip.Tip="Close">
+                        <TextBlock Text="✕" FontSize="14" FontWeight="Bold" Foreground="#FFFFFF"/>
                     </Button>
                 </StackPanel>
             </Grid>
 
             <!-- Main layout: left=canvas, right=controls -->
-            <Grid Row="1" ColumnDefinitions="380,*" Margin="20,16,20,16">
+            <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto">
+                <Grid ColumnDefinitions="380,*" Margin="20,16,20,16">
 
-                <!-- LEFT: Color Canvas + Preview -->
+                    <!-- LEFT: Color Canvas + Preview -->
                 <StackPanel Grid.Column="0" Spacing="16" Margin="0,0,16,0">
 
                     <!-- Color Canvas (Saturation/Value picker) -->
@@ -68,6 +69,18 @@
                                 Height="20"
                                 Margin="0,4"
                                 Hue="{Binding HueSliderValue, Mode=TwoWay}" />
+
+                            <!-- Pick from screen button -->
+                            <Button Classes="action-btn"
+                                    HorizontalAlignment="Stretch"
+                                    HorizontalContentAlignment="Center"
+                                    Command="{Binding PickFromScreenCommand}"
+                                    ToolTip.Tip="Pick a color from screen">
+                                <StackPanel Orientation="Horizontal" Spacing="6" HorizontalAlignment="Center">
+                                    <TextBlock Text="💉" FontSize="14" VerticalAlignment="Center"/>
+                                    <TextBlock Text="Pick color" FontSize="13" VerticalAlignment="Center"/>
+                                </StackPanel>
+                            </Button>
                         </StackPanel>
                     </Border>
 
@@ -145,8 +158,7 @@
                 </StackPanel>
 
                 <!-- RIGHT: Sliders, values, harmonies -->
-                <ScrollViewer Grid.Column="1" VerticalScrollBarVisibility="Auto">
-                    <StackPanel Spacing="16" Margin="4,0,0,0">
+                <StackPanel Grid.Column="1" Spacing="16" Margin="4,0,0,0">
 
                         <!-- RGB Section -->
                         <Border Classes="panel">
@@ -320,46 +332,11 @@
                             </StackPanel>
                         </Border>
 
-                        <!-- Harmony Section -->
-                        <Border Classes="panel">
-                            <StackPanel Spacing="8">
-                                <TextBlock Classes="section-header" Text="Color Harmonies"/>
 
-                                <ComboBox Classes="harmony-combo"
-                                          SelectedItem="{Binding SelectedHarmonyType, Mode=TwoWay}"
-                                          HorizontalAlignment="Stretch">
-                                    <ComboBoxItem Content="Complementary" IsSelected="True"/>
-                                    <ComboBoxItem Content="Analogous"/>
-                                    <ComboBoxItem Content="Triadic"/>
-                                    <ComboBoxItem Content="Tetradic"/>
-                                    <ComboBoxItem Content="Split Complementary"/>
-                                    <ComboBoxItem Content="Monochromatic"/>
-                                    <ComboBoxItem Content="Shades"/>
-                                    <ComboBoxItem Content="Tints"/>
-                                </ComboBox>
-
-                                <ItemsControl ItemsSource="{Binding HarmonyColors}">
-                                    <ItemsControl.ItemsPanel>
-                                        <ItemsPanelTemplate>
-                                            <WrapPanel/>
-                                        </ItemsPanelTemplate>
-                                    </ItemsControl.ItemsPanel>
-                                    <ItemsControl.ItemTemplate>
-                                        <DataTemplate x:DataType="vm:HarmonyColorItem">
-                                            <Button Classes="swatch-btn"
-                                                    Background="{Binding Hex, Converter={StaticResource HexToBrushConverter}}"
-                                                    Command="{Binding $parent[Window].((vm:MainWindowViewModel)DataContext).ApplyHarmonyColorCommand}"
-                                                    CommandParameter="{Binding Hex}"
-                                                    ToolTip.Tip="{Binding Label}"/>
-                                        </DataTemplate>
-                                    </ItemsControl.ItemTemplate>
-                                </ItemsControl>
-                            </StackPanel>
-                        </Border>
 
                     </StackPanel>
-                </ScrollViewer>
-            </Grid>
+                </Grid>
+            </ScrollViewer>
         </Grid>
 
         <!-- Toast notification overlay -->

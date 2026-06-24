@@ -59,12 +59,6 @@ public partial class MainWindowViewModel : ViewModelBase
     [ObservableProperty] private double _canvasValue = 100;
     [ObservableProperty] private double _hueSliderValue = 243.46;
 
-    // ========================
-    // Harmony
-    // ========================
-
-    [ObservableProperty] private string _selectedHarmonyType = "Complementary";
-    [ObservableProperty] private ObservableCollection<HarmonyColorItem> _harmonyColors = new();
 
     // ========================
     // History
@@ -97,7 +91,6 @@ public partial class MainWindowViewModel : ViewModelBase
 
         // Initial sync from hex color
         SyncAllFromColor(CurrentColor);
-        UpdateHarmonyColors();
     }
 
     // ========================
@@ -233,14 +226,6 @@ public partial class MainWindowViewModel : ViewModelBase
         }
     }
 
-    // ========================
-    // Harmony Change Handler
-    // ========================
-
-    partial void OnSelectedHarmonyTypeChanged(string value)
-    {
-        UpdateHarmonyColors();
-    }
 
     // ========================
     // Sync Methods
@@ -275,8 +260,6 @@ public partial class MainWindowViewModel : ViewModelBase
         CanvasValue = color.HsvV;
         HueSliderValue = color.HsvH;
 
-        UpdateHarmonyColors();
-
         _suppressUpdates = prev;
     }
 
@@ -301,8 +284,6 @@ public partial class MainWindowViewModel : ViewModelBase
         CanvasSaturation = color.HsvS;
         CanvasValue = color.HsvV;
         HueSliderValue = color.HsvH;
-
-        UpdateHarmonyColors();
     }
 
     private void SyncNonHsvFromColor(ColorModel color)
@@ -326,8 +307,6 @@ public partial class MainWindowViewModel : ViewModelBase
         CanvasSaturation = color.HsvS;
         CanvasValue = color.HsvV;
         HueSliderValue = color.HsvH;
-
-        UpdateHarmonyColors();
     }
 
     private void SyncNonHslFromColor(ColorModel color)
@@ -351,8 +330,6 @@ public partial class MainWindowViewModel : ViewModelBase
         CanvasSaturation = color.HsvS;
         CanvasValue = color.HsvV;
         HueSliderValue = color.HsvH;
-
-        UpdateHarmonyColors();
     }
 
     private void SyncNonCmykFromColor(ColorModel color)
@@ -375,40 +352,8 @@ public partial class MainWindowViewModel : ViewModelBase
         CanvasSaturation = color.HsvS;
         CanvasValue = color.HsvV;
         HueSliderValue = color.HsvH;
-
-        UpdateHarmonyColors();
     }
 
-    // ========================
-    // Harmony
-    // ========================
-
-    private void UpdateHarmonyColors()
-    {
-        HarmonyColors.Clear();
-
-        var colors = SelectedHarmonyType switch
-        {
-            "Complementary" => new System.Collections.Generic.List<ColorModel>
-            {
-                CurrentColor.Clone(),
-                ColorHarmonyHelper.GetComplementary(CurrentColor)
-            },
-            "Analogous" => ColorHarmonyHelper.GetAnalogous(CurrentColor),
-            "Triadic" => ColorHarmonyHelper.GetTriadic(CurrentColor),
-            "Tetradic" => ColorHarmonyHelper.GetTetradic(CurrentColor),
-            "Split Complementary" => ColorHarmonyHelper.GetSplitComplementary(CurrentColor),
-            "Monochromatic" => ColorHarmonyHelper.GetMonochromatic(CurrentColor),
-            "Shades" => ColorHarmonyHelper.GetShades(CurrentColor),
-            "Tints" => ColorHarmonyHelper.GetTints(CurrentColor),
-            _ => new System.Collections.Generic.List<ColorModel> { CurrentColor.Clone() },
-        };
-
-        foreach (var c in colors)
-        {
-            HarmonyColors.Add(new HarmonyColorItem(c.Hex, c.Hex));
-        }
-    }
 
     // ========================
     // Commands
@@ -445,26 +390,7 @@ public partial class MainWindowViewModel : ViewModelBase
         await ShowToastAsync($"Copied {text}");
     }
 
-    [RelayCommand]
-    private async Task CopyHarmonyColor(string? hex)
-    {
-        if (!string.IsNullOrEmpty(hex))
-        {
-            await _clipboardService.CopyToClipboardAsync(hex);
-            await ShowToastAsync($"Copied {hex}");
-        }
-    }
 
-    [RelayCommand]
-    private void ApplyHarmonyColor(string? hex)
-    {
-        if (!string.IsNullOrEmpty(hex))
-        {
-            var color = ColorModel.FromHex(hex);
-            CurrentColor = color;
-            SyncAllFromColor(color);
-        }
-    }
 
     [RelayCommand]
     private void AddToHistory()
@@ -565,5 +491,4 @@ public partial class MainWindowViewModel : ViewModelBase
 // Supporting Types
 // ========================
 
-public record HarmonyColorItem(string Hex, string Label);
 public record HistoryColorItem(string Hex, string Label);
