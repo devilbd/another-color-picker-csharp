@@ -10,6 +10,7 @@ namespace AnotherColorPicker.Services;
 public interface IScreenshotPortal : IDBusObject
 {
     Task<ObjectPath> PickColorAsync(string parent_window, IDictionary<string, object> options);
+    Task<ObjectPath> ScreenshotAsync(string parent_window, IDictionary<string, object> options);
 }
 
 [DBusInterface("org.freedesktop.portal.Request")]

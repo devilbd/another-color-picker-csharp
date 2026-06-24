@@ -28,6 +28,28 @@ public static class NativePixelReader
         return null;
     }
 
+    public static Color[]? GetPixelsAroundCursor(int radius, out int width, out int height)
+    {
+        width = 2 * radius + 1;
+        height = 2 * radius + 1;
+
+        try
+        {
+            if (OperatingSystem.IsWindows())
+                return GetWindowsPixels(radius, width, height);
+            if (OperatingSystem.IsLinux())
+                return GetLinuxPixels(radius, width, height);
+            if (OperatingSystem.IsMacOS())
+                return GetMacPixels(radius, width, height);
+        }
+        catch
+        {
+            // Ignore native interop failures
+        }
+        
+        return null;
+    }
+
     // ==========================================================
     // Windows Implementation
     // ==========================================================
@@ -47,6 +69,26 @@ public static class NativePixelReader
     [DllImport("gdi32.dll")]
     private static extern uint GetPixel(IntPtr hdc, int nXPos, int nYPos);
 
+    [DllImport("gdi32.dll")]
+    private static extern IntPtr CreateCompatibleDC(IntPtr hdc);
+
+    [DllImport("gdi32.dll")]
+    private static extern IntPtr CreateCompatibleBitmap(IntPtr hdc, int nWidth, int nHeight);
+
+    [DllImport("gdi32.dll")]
+    private static extern IntPtr SelectObject(IntPtr hdc, IntPtr hgdiobj);
+
+    [DllImport("gdi32.dll")]
+    private static extern bool BitBlt(IntPtr hdcDest, int nXDest, int nYDest, int nWidth, int nHeight, IntPtr hdcSrc, int nXSrc, int nYSrc, uint dwRop);
+
+    [DllImport("gdi32.dll")]
+    private static extern bool DeleteDC(IntPtr hdc);
+
+    [DllImport("gdi32.dll")]
+    private static extern bool DeleteObject(IntPtr hObject);
+
+    private const uint SRCCOPY = 0x00CC0020;
+
     private static Color? GetWindowsPixel()
     {
         if (!GetCursorPos(out var p)) return null;
@@ -65,6 +107,40 @@ public static class NativePixelReader
         byte b = (byte)((pixel & 0x00FF0000) >> 16);
 
         return Color.FromRgb(r, g, b);
+    }
+
+    private static Color[]? GetWindowsPixels(int radius, int width, int height)
+    {
+        if (!GetCursorPos(out var p)) return null;
+
+        IntPtr hdcScreen = GetDC(IntPtr.Zero);
+        if (hdcScreen == IntPtr.Zero) return null;
+
+        IntPtr hdcMem = CreateCompatibleDC(hdcScreen);
+        IntPtr hBitmap = CreateCompatibleBitmap(hdcScreen, width, height);
+        IntPtr hOld = SelectObject(hdcMem, hBitmap);
+
+        BitBlt(hdcMem, 0, 0, width, height, hdcScreen, p.X - radius, p.Y - radius, SRCCOPY);
+
+        Color[] colors = new Color[width * height];
+        for (int y = 0; y < height; y++)
+        {
+            for (int x = 0; x < width; x++)
+            {
+                uint pixel = GetPixel(hdcMem, x, y);
+                byte r = (byte)(pixel & 0x000000FF);
+                byte g = (byte)((pixel & 0x0000FF00) >> 8);
+                byte b = (byte)((pixel & 0x00FF0000) >> 16);
+                colors[y * width + x] = Color.FromRgb(r, g, b);
+            }
+        }
+
+        SelectObject(hdcMem, hOld);
+        DeleteObject(hBitmap);
+        DeleteDC(hdcMem);
+        ReleaseDC(IntPtr.Zero, hdcScreen);
+
+        return colors;
     }
 
     // ==========================================================
@@ -131,6 +207,51 @@ public static class NativePixelReader
         }
     }
 
+    private static Color[]? GetLinuxPixels(int radius, int width, int height)
+    {
+        if (Environment.GetEnvironmentVariable("WAYLAND_DISPLAY") != null)
+            return null;
+
+        IntPtr display = XOpenDisplay(IntPtr.Zero);
+        if (display == IntPtr.Zero) return null;
+
+        try
+        {
+            IntPtr root = XDefaultRootWindow(display);
+            if (!XQueryPointer(display, root, out _, out _, out int rx, out int ry, out _, out _, out _))
+            {
+                return null;
+            }
+
+            IntPtr image = XGetImage(display, root, rx - radius, ry - radius, (uint)width, (uint)height, ~0ul, 2);
+            if (image == IntPtr.Zero)
+            {
+                return null;
+            }
+
+            Color[] colors = new Color[width * height];
+            for (int y = 0; y < height; y++)
+            {
+                for (int x = 0; x < width; x++)
+                {
+                    ulong pixel = XGetPixel(image, x, y);
+                    byte b = (byte)(pixel & 0xFF);
+                    byte g = (byte)((pixel >> 8) & 0xFF);
+                    byte r = (byte)((pixel >> 16) & 0xFF);
+                    colors[y * width + x] = Color.FromRgb(r, g, b);
+                }
+            }
+
+            XDestroyImage(image);
+
+            return colors;
+        }
+        finally
+        {
+            XCloseDisplay(display);
+        }
+    }
+
     // ==========================================================
     // macOS Implementation (CoreGraphics)
     // ==========================================================
@@ -168,6 +289,12 @@ public static class NativePixelReader
     [DllImport("/System/Library/Frameworks/CoreFoundation.framework/CoreFoundation")]
     private static extern nint CFDataGetLength(IntPtr data);
 
+    [DllImport("/System/Library/Frameworks/CoreGraphics.framework/CoreGraphics")]
+    private static extern nint CGImageGetBytesPerRow(IntPtr image);
+
+    [DllImport("/System/Library/Frameworks/CoreGraphics.framework/CoreGraphics")]
+    private static extern void CGImageRelease(IntPtr image);
+
     private static Color? GetMacPixel()
     {
         IntPtr evt = CGEventCreate(IntPtr.Zero);
@@ -182,9 +309,6 @@ public static class NativePixelReader
             Size = new CGSize { Width = 1, Height = 1 }
         };
 
-        // kCGWindowListOptionOnScreenOnly = (1 << 0)
-        // kCGNullWindowID = 0
-        // kCGWindowImageDefault = 0
         IntPtr cgImage = CGWindowListCreateImage(rect, 1, 0, 0);
         if (cgImage == IntPtr.Zero) return null;
 
@@ -202,7 +326,6 @@ public static class NativePixelReader
                 unsafe
                 {
                     byte* p = (byte*)bytePtr;
-                    // Usually BGRA on Mac
                     byte b = p[0];
                     byte g = p[1];
                     byte r = p[2];
@@ -216,6 +339,64 @@ public static class NativePixelReader
         return result;
     }
 
-    [DllImport("/System/Library/Frameworks/CoreGraphics.framework/CoreGraphics")]
-    private static extern void CGImageRelease(IntPtr image);
+    private static Color[]? GetMacPixels(int radius, int width, int height)
+    {
+        IntPtr evt = CGEventCreate(IntPtr.Zero);
+        if (evt == IntPtr.Zero) return null;
+
+        CGPoint loc = CGEventGetLocation(evt);
+        CFRelease(evt);
+
+        CGRect rect = new CGRect
+        {
+            Origin = new CGPoint { X = loc.X - radius, Y = loc.Y - radius },
+            Size = new CGSize { Width = width, Height = height }
+        };
+
+        IntPtr cgImage = CGWindowListCreateImage(rect, 1, 0, 0);
+        if (cgImage == IntPtr.Zero) return null;
+
+        IntPtr dataProvider = CGImageGetDataProvider(cgImage);
+        IntPtr cfData = CGDataProviderCopyData(dataProvider);
+        
+        Color[]? result = null;
+        if (cfData != IntPtr.Zero)
+        {
+            IntPtr bytePtr = CFDataGetBytePtr(cfData);
+            nint length = CFDataGetLength(cfData);
+            nint bytesPerRow = CGImageGetBytesPerRow(cgImage);
+
+            if (bytePtr != IntPtr.Zero && length > 0)
+            {
+                result = new Color[width * height];
+                unsafe
+                {
+                    byte* p = (byte*)bytePtr;
+                    for (int y = 0; y < height; y++)
+                    {
+                        for (int x = 0; x < width; x++)
+                        {
+                            long offset = y * bytesPerRow + x * 4;
+                            if (offset + 3 < length)
+                            {
+                                byte b = p[offset];
+                                byte g = p[offset + 1];
+                                byte r = p[offset + 2];
+                                result[y * width + x] = Color.FromRgb(r, g, b);
+                            }
+                            else
+                            {
+                                result[y * width + x] = Colors.Black;
+                            }
+                        }
+                    }
+                }
+            }
+            CFRelease(cfData);
+        }
+        
+        CGImageRelease(cgImage);
+        return result;
+    }
 }
+

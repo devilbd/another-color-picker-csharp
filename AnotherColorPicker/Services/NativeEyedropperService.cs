@@ -4,7 +4,9 @@ using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Controls.ApplicationLifetimes;
 using Avalonia.Input;
+using Avalonia.Layout;
 using Avalonia.Media;
+using Avalonia.Media.Imaging;
 using Avalonia.Threading;
 
 namespace AnotherColorPicker.Services;
@@ -15,11 +17,16 @@ namespace AnotherColorPicker.Services;
 /// </summary>
 public class NativeEyedropperService : IEyedropperService
 {
-    private readonly WaylandEyedropperService _fallbackService;
+    private readonly ScreenshotEyedropperService _screenshotFallbackService;
+    private readonly WaylandEyedropperService _portalFallbackService;
+    private const int MagnifierRadius = 5;
+    private const int MagnifierSize = 11; // 2 * Radius + 1
+    private const int ZoomScale = 10;
 
     public NativeEyedropperService()
     {
-        _fallbackService = new WaylandEyedropperService();
+        _screenshotFallbackService = new ScreenshotEyedropperService();
+        _portalFallbackService = new WaylandEyedropperService();
     }
 
     public event Action<Color>? ColorPreview;
@@ -32,15 +39,26 @@ public class NativeEyedropperService : IEyedropperService
     {
         if (IsWayland)
         {
-            // Wayland strictly prevents direct pixel reading.
-            _fallbackService.ColorPreview += OnFallbackPreview;
+            // Wayland strictly prevents direct pixel reading. Use Screenshot fallback first
+            // to provide the custom magnifier experience.
+            _screenshotFallbackService.ColorPreview += OnFallbackPreview;
+            var screenshotResult = await _screenshotFallbackService.PickColorAsync();
+            _screenshotFallbackService.ColorPreview -= OnFallbackPreview;
+
+            if (screenshotResult.HasValue)
+            {
+                return screenshotResult.Value;
+            }
+
+            // If taking a screenshot fails (e.g., missing grim/scrot), use native portal which doesn't have our magnifier
+            _portalFallbackService.ColorPreview += OnFallbackPreview;
             try
             {
-                return await _fallbackService.PickColorAsync();
+                return await _portalFallbackService.PickColorAsync();
             }
             finally
             {
-                _fallbackService.ColorPreview -= OnFallbackPreview;
+                _portalFallbackService.ColorPreview -= OnFallbackPreview;
             }
         }
 
@@ -72,6 +90,113 @@ public class NativeEyedropperService : IEyedropperService
             Cursor = new Cursor(StandardCursorType.Cross),
         };
 
+        var canvas = new Canvas();
+
+        var magnifierImage = new Avalonia.Controls.Image
+        {
+            Width = MagnifierSize * ZoomScale,
+            Height = MagnifierSize * ZoomScale,
+            Stretch = Stretch.UniformToFill
+        };
+        RenderOptions.SetBitmapInterpolationMode(magnifierImage, BitmapInterpolationMode.None);
+
+        var hexText = new TextBlock
+        {
+            Foreground = Brushes.White,
+            Background = new SolidColorBrush(Color.Parse("#AA000000")),
+            Padding = new Thickness(4, 2),
+            FontSize = 12,
+            HorizontalAlignment = HorizontalAlignment.Center,
+            VerticalAlignment = VerticalAlignment.Bottom,
+            Margin = new Thickness(0, 0, 0, 4)
+        };
+
+        var crosshair = new Border
+        {
+            BorderBrush = Brushes.White,
+            BorderThickness = new Thickness(1),
+            Width = ZoomScale,
+            Height = ZoomScale,
+            HorizontalAlignment = HorizontalAlignment.Center,
+            VerticalAlignment = VerticalAlignment.Center
+        };
+
+        var magnifierBorder = new Border
+        {
+            BorderBrush = new SolidColorBrush(Color.Parse("#333333")),
+            BorderThickness = new Thickness(2),
+            CornerRadius = new CornerRadius(10),
+            Background = Brushes.Black,
+            ClipToBounds = true,
+            Width = MagnifierSize * ZoomScale,
+            Height = MagnifierSize * ZoomScale,
+            IsVisible = false
+        };
+
+        var magnifierGrid = new Grid();
+        magnifierGrid.Children.Add(magnifierImage);
+        magnifierGrid.Children.Add(crosshair);
+        magnifierGrid.Children.Add(hexText);
+
+        magnifierBorder.Child = magnifierGrid;
+        canvas.Children.Add(magnifierBorder);
+        
+        overlayWindow.Content = canvas;
+
+        var writeableBitmap = new WriteableBitmap(
+            new PixelSize(MagnifierSize, MagnifierSize),
+            new Vector(96, 96),
+            Avalonia.Platform.PixelFormat.Bgra8888,
+            Avalonia.Platform.AlphaFormat.Premul);
+        magnifierImage.Source = writeableBitmap;
+
+        Point lastPointerPos = default;
+
+        Action updateMagnifier = () =>
+        {
+            var colors = NativePixelReader.GetPixelsAroundCursor(MagnifierRadius, out int w, out int h);
+            if (colors != null && w == MagnifierSize && h == MagnifierSize)
+            {
+                using (var fb = writeableBitmap.Lock())
+                {
+                    unsafe
+                    {
+                        byte* ptr = (byte*)fb.Address;
+                        for (int y = 0; y < h; y++)
+                        {
+                            for (int x = 0; x < w; x++)
+                            {
+                                int idx = y * w + x;
+                                var c = colors[idx];
+                                int offset = y * fb.RowBytes + x * 4;
+                                ptr[offset] = c.B;
+                                ptr[offset + 1] = c.G;
+                                ptr[offset + 2] = c.R;
+                                ptr[offset + 3] = 255;
+                            }
+                        }
+                    }
+                }
+                magnifierBorder.IsVisible = true;
+                
+                var centerColor = colors[(MagnifierSize / 2) * MagnifierSize + (MagnifierSize / 2)];
+                hexText.Text = $"#{centerColor.R:X2}{centerColor.G:X2}{centerColor.B:X2}";
+                ColorPreview?.Invoke(centerColor);
+                
+                Canvas.SetLeft(magnifierBorder, lastPointerPos.X + 20);
+                Canvas.SetTop(magnifierBorder, lastPointerPos.Y + 20);
+            }
+            else
+            {
+                magnifierBorder.IsVisible = false;
+                var color = NativePixelReader.GetColorUnderCursor();
+                if (color.HasValue)
+                {
+                    ColorPreview?.Invoke(color.Value);
+                }
+            }
+        };
+
         DispatcherTimer? updateTimer = null;
 
         overlayWindow.Opened += (_, _) =>
@@ -83,36 +208,29 @@ public class NativeEyedropperService : IEyedropperService
 
             updateTimer.Tick += (s, e) =>
             {
-                var color = NativePixelReader.GetColorUnderCursor();
-                if (color.HasValue)
-                {
-                    ColorPreview?.Invoke(color.Value);
-                }
+                updateMagnifier();
             };
             
             updateTimer.Start();
         };
 
-        // Also update on pointer move for immediate feedback
         overlayWindow.PointerMoved += (_, e) =>
         {
-            var color = NativePixelReader.GetColorUnderCursor();
-            if (color.HasValue)
-            {
-                ColorPreview?.Invoke(color.Value);
-            }
+            lastPointerPos = e.GetPosition(canvas);
+            updateMagnifier();
         };
 
         overlayWindow.PointerPressed += (_, e) =>
         {
             updateTimer?.Stop();
             
-            // For the final pick, we temporarily hide the overlay to ensure we don't accidentally read its tint
-            // if the platform composed it with a slight opacity.
+            // Hide overlay momentarily to capture final color cleanly without our own UI
             overlayWindow.Opacity = 0;
             
             var finalColor = NativePixelReader.GetColorUnderCursor();
             tcs.TrySetResult(finalColor);
+            
+            writeableBitmap.Dispose();
             overlayWindow.Close();
         };
 
@@ -122,6 +240,8 @@ public class NativeEyedropperService : IEyedropperService
             {
                 updateTimer?.Stop();
                 tcs.TrySetResult(null);
+                
+                writeableBitmap.Dispose();
                 overlayWindow.Close();
             }
         };
