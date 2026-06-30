@@ -196,7 +196,7 @@ public class ScreenshotEyedropperService : IEyedropperService
         var overlayWindow = new Window
         {
             WindowDecorations = WindowDecorations.None,
-            WindowState = WindowState.FullScreen,
+            WindowState = WindowState.Normal,
             Topmost = true,
             ShowInTaskbar = false,
             Background = Brushes.Black,
@@ -208,7 +208,9 @@ public class ScreenshotEyedropperService : IEyedropperService
         var imageControl = new Avalonia.Controls.Image
         {
             Source = screenshot,
-            Stretch = Stretch.Fill,
+            Stretch = Stretch.None,
+            HorizontalAlignment = HorizontalAlignment.Left,
+            VerticalAlignment = VerticalAlignment.Top
         };
         rootGrid.Children.Add(imageControl);
 
@@ -394,6 +396,19 @@ public class ScreenshotEyedropperService : IEyedropperService
                 overlayWindow.Close();
             }
         };
+
+        var screens = overlayWindow.Screens.All;
+        if (screens.Count > 0)
+        {
+            var minX = System.Linq.Enumerable.Min(screens, s => s.Bounds.X);
+            var minY = System.Linq.Enumerable.Min(screens, s => s.Bounds.Y);
+            var maxX = System.Linq.Enumerable.Max(screens, s => s.Bounds.Right);
+            var maxY = System.Linq.Enumerable.Max(screens, s => s.Bounds.Bottom);
+            
+            overlayWindow.Position = new PixelPoint(minX, minY);
+            overlayWindow.Width = (maxX - minX) / overlayWindow.RenderScaling;
+            overlayWindow.Height = (maxY - minY) / overlayWindow.RenderScaling;
+        }
 
         overlayWindow.Show();
 
